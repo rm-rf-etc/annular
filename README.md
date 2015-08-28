@@ -22,7 +22,7 @@ server for a backend, and running `grunt` starts the server.
 
 * The framework lives in `node_modules/app/libs`.
 * The sample web application lives in `./main.js` and `node_modules/app/ui`.
-* `app/routing.js` is a middleware for browserSync which serves up a read-only backend. (or you can use firebase. See `main.js`).
+* `app/server/routing.js` is a middleware for browserSync which serves up a read-only backend. (or you can use firebase. See `main.js`).
 
 See [todo-ui.js](//github.com/rm-rf-etc/concise/blob/master/node_modules/app/ui/todo-ui.js).
 See [auth-form-ui.js](//github.com/rm-rf-etc/concise/blob/master/node_modules/app/ui/auth-form-ui.js).
