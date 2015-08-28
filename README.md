@@ -12,12 +12,17 @@ _Concise.js_ is an experimental frontend framework. The general philosophy is to
 ## Demo
 
 Steps:
+* `git clone --recursive https://github.com/rm-rf-etc/concise.git`
 * `npm install`
 * `grunt`
 * `open http://localhost:3000` (the 'open' command works on Macs)
 
-This project uses the browserSync built-in server, and running `grunt` starts the server. `app/routing.js` is a middleware
-for browserSync which serves up a read-only backend. (or you can use the firebase endpoint. See `main.js`).
+This repo is for developing Concise.js & Connected.js, and to that end, includes a working to-do app. It uses the browserSync built-in
+server for a backend, and running `grunt` starts the server.
+
+* The framework lives in `node_modules/app/libs`.
+* The sample web application lives in `./main.js` and `node_modules/app/ui`.
+* `app/routing.js` is a middleware for browserSync which serves up a read-only backend. (or you can use firebase. See `main.js`).
 
 See [todo-ui.js](//github.com/rm-rf-etc/concise/blob/master/node_modules/app/ui/todo-ui.js).
 See [auth-form-ui.js](//github.com/rm-rf-etc/concise/blob/master/node_modules/app/ui/auth-form-ui.js).
