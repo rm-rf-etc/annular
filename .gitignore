@@ -1,4 +1,5 @@
 .DS_Store
 public/scripts/*
-node_modules/*
 app/scripts/*
+
+node_modules/[^app]*

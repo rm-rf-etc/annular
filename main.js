@@ -12,13 +12,13 @@ var USE_FIREBASE = false
 
 ;(function(){
 
-	var concise = require('./libs/concise.js')
-	var connected = require('./libs/connected.js')
+	var concise = require('app/libs/concise')
+	var connected = require('app/libs/connected')
 	var Bindable = connected.Bindable
 
 	var uis = {
-		todo: require('./ui/todo-ui.js'),
-		auth_me: require('./ui/auth-form-ui.js')
+		todo: require('app/ui/todo-ui.js'),
+		auth_me: require('app/ui/auth-form-ui.js')
 	}
 
 	var ctrls, list
