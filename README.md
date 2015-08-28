@@ -1,3 +1,7 @@
+
+Make sure you use **--recursive**:  
+`git clone --recursive https://github.com/rm-rf-etc/concise.git`
+
 # Concise.js
 
 (WIP)
@@ -15,8 +19,8 @@ Steps:
 This project uses the browserSync built-in server, and running `grunt` starts the server. `app/routing.js` is a middleware
 for browserSync which serves up a read-only backend. (or you can use the firebase endpoint. See `main.js`).
 
-See [todo-ui.js](//github.com/rm-rf-etc/concise/blob/master/ui/todo-ui.js).
-See [auth-form-ui.js](//github.com/rm-rf-etc/concise/blob/master/ui/auth-form-ui.js).
+See [todo-ui.js](//github.com/rm-rf-etc/concise/blob/master/node_modules/app/ui/todo-ui.js).
+See [auth-form-ui.js](//github.com/rm-rf-etc/concise/blob/master/node_modules/app/ui/auth-form-ui.js).
 
 
 ## License
