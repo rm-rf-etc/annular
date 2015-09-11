@@ -1,8 +1,0 @@
-{
-  "generator-ify": {
-    "settings": {
-      "useGrunt": true,
-      "useLocalServer": true
-    }
-  }
-}

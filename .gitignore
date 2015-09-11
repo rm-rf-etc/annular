@@ -1,7 +1,7 @@
 .DS_Store
-public/scripts/*
-app/scripts/*
 
 node_modules/*
-!node_modules/app
-
+!node_modules/typeof
+!node_modules/connected
+!node_modules/concise
+!node_modules/runway
