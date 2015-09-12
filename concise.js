@@ -49,6 +49,7 @@ http://inimino.org/~inimino/blog/javascript_semicolons
 	var _current_modifiers_
 	var MicroEvent = require('microevent')
 	var _controller_events = new MicroEvent()
+	var _regions
 
 	var runway = require('runway/runway-browser.js')
 	Object.keys(runway).map(function(prop){
@@ -88,6 +89,13 @@ http://inimino.org/~inimino/blog/javascript_semicolons
 		this.view_body.appendChild(view)
 	}
 
+	Concise.prototype.Model = function(name, obj) {
+		if (typeOf(obj) === 'Object' || typeOf(obj) === 'Array') {
+			concise.models._new_property_ = [name, new Bindable(obj)]
+			return concise.models[name]
+		}
+	}
+
 	Concise.prototype.get = function(path, cb){
 		var xhr = global.XMLHttpRequest || ActiveXObject
 		var request = new xhr('MSXML2.XMLHTTP.3.0')
@@ -108,18 +116,52 @@ http://inimino.org/~inimino/blog/javascript_semicolons
 		request.send()
 	}
 
+	Concise.prototype.inject = function(href) {
+		var js = document.createElement('script')
+		js.src = href
+		document.body.appendChild(js)
+	}
+
 	Concise.prototype.helpers = require('concise/concise.helpers.js')
 	Concise.prototype.Controller = Controller
-	Concise.prototype.ViewLayout = ViewLayout
-
-	// How this structure will be organized is still being worked out.
-	// This works for now.
-	Concise.prototype.models = Controller.prototype.models = {}
-	// Concise.prototype.models = {}
-	// Controller.prototype.parent = concise
+	Concise.prototype.models = new Bindable({})
 
 
-	function Controller(name /*, constructor */){
+
+	function Regions(){
+
+		this.list = {}
+
+		var self = this
+
+		self.define = function(name, el){
+			if (! self.list[name]) {
+				self.list[name] = el
+			} else {
+				console.error('ERROR: Cannot redefine partial "'+name+'"')
+			}
+		}
+
+		self.newMention = function(name, C$){
+			if (self.list[name]) renderPartial()
+			self.bind(name, renderPartial)
+
+			function renderPartial(){
+				C$.el.innerHTML = ''
+				C$.dom = self.list[name]
+			}
+		}
+	}
+	_regions = (new Regions())
+	MicroEvent.mixin(Regions)
+
+	Concise.prototype.Region = function Region(name, el){
+		_regions.define(name, el)
+	}
+
+
+
+	function Controller(name, constructor){
 		console.log(this)
 
 		this._id = name || Math.random().toString().split('.')[1]
@@ -130,24 +172,24 @@ http://inimino.org/~inimino/blog/javascript_semicolons
 
 		this.builder = new DomBuilder(null, view)
 
-		arguments[arguments.length-1].call(this)
+		// arguments[arguments.length-1].call(this)
+		constructor.call(this)
 
 		return function(){
 			_controller_events.trigger(this._id)
 			concise.setView(view)
 		}
 	}
-
 	Controller.prototype.onActive = function(fn){
 		_controller_events.bind(this._id, fn)
 	}
-
-	// Controller.prototype.parent = Concise
-
 	DEFINE(Controller.prototype, 'view', {enumerable:false, configurable:false,
-		set:function(fn){
-			this.builder.dom = fn(this)
+		set:function(view){
+			this.builder.dom = typeOf(view) === 'Function' ? view(this) : view
 		}
+	})
+	DEFINE(Controller.prototype, 'models', {enumerable:false, configurable:false,
+		get:function(){ return concise.models }
 	})
 
 
@@ -166,7 +208,7 @@ http://inimino.org/~inimino/blog/javascript_semicolons
 		if (! familyOf(this.el)) throw new Error('Missing valid view element. Cannot build a DOM before doing `$.view = document.querySelector(<your_selector>)`.')
 		if (typeOf(structure) !== 'Object') throw new Error('Invalid dom structure object.')
 
-		var helper_fn, helper_str, builder, val, data, parsed, el
+		var helper_fn, helper_str, builder, val, expected_model, data, parsed, el
 
 
 		Object.keys(structure).map( recursiveDomBuildingProcess.bind(this) )
@@ -191,17 +233,22 @@ http://inimino.org/~inimino/blog/javascript_semicolons
 					var context = Context ? new Context() : {}
 
 					parsed.helpers.map(function(helper_str){
-						//
+						var _parent, _prop
 						if (typeOf(val) !== 'Function') throw new Error('DOM object "'+key+'" defined with helper method but has no function upon which to apply it.')
 
 						helper_fn = concise.helpers[ helper_str.split('(')[0] ]
 
-						data = /\((.+)\)/g.exec(helper_str)[1]
-						data = data.split('.').reduce(function(object, prop){
+						expected_model = /\((.+)\)/g.exec(helper_str)[1]
+						data = expected_model.split('.').reduce(function(object, prop){
+							_parent = object
+							_prop = prop
 							return object[prop]
 						}, concise.models)
+						if (! data) {
+							console.info('Alert! Expected model "'+expected_model+'" not available for each() templating helper')
+						}
 						builder = new DomBuilder(this, el)
-						helper_fn.call(context,builder,data,val)
+						helper_fn.call(context,builder,_parent,_prop,val)
 						this.el.appendChild(el)
 
 					}.bind(this))
@@ -218,6 +265,12 @@ http://inimino.org/~inimino/blog/javascript_semicolons
 
 				case typeOf(val) === 'Object':
 					domBuilderMethod.call({ el:el, parent:this.parent }, val)
+					this.el.appendChild(el)
+
+					break
+
+				case typeOf(val) === 'String':
+					el.innerHTML = val
 					this.el.appendChild(el)
 
 					break
@@ -253,6 +306,10 @@ http://inimino.org/~inimino/blog/javascript_semicolons
 
 	DomBuilder.prototype.setValid = function(bool, string){
 		this.el.setCustomValidity( bool ? '' : string )
+	}
+
+	DomBuilder.prototype.partial = function(name){
+		if (_regions) _regions.newMention(name, this)
 	}
 
 	DomBuilder.prototype.formValidate = function(){
@@ -392,16 +449,6 @@ http://inimino.org/~inimino/blog/javascript_semicolons
 			return false
 		}
 		else return true
-	}
-
-
-
-	function ViewLayout(dom){
-		//
-
-		return function(){
-			//
-		}
 	}
 
 
