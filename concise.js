@@ -29,6 +29,10 @@ Semi-colon line terminators are just FUD. If your minifier can't handle this cod
 http://blog.izs.me/post/2353458699/an-open-letter-to-javascript-leaders-regarding
 http://inimino.org/~inimino/blog/javascript_semicolons
 
+The only time you EVER need a semi-colon for statement termination:
+;[1,2,3].map(function(val){ 'do stuff' })
+;(function(){ 'do stuff' })
+
 */
 
 
