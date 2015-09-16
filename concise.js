@@ -125,10 +125,10 @@ The only time you EVER need a semi-colon for statement termination:
 	}
 
 	Concise.prototype.helpers = require('concise/concise.helpers.js')
-	Concise.prototype.Controller = Controller
-	Concise.prototype.models = new Bindable({})
-	Concise.prototype.Region = Region
 
+	Concise.prototype.models = new Bindable({})
+
+	Concise.prototype.Region = Region
 
 	function Region(partials){
 		this.area = document.createElement('div')
@@ -146,13 +146,9 @@ The only time you EVER need a semi-colon for statement termination:
 			if (typeOf(obj) !== 'Object') throw new Error('Region received invalid view object. Expected plain JS object.')
 			partials[i] = new DomBuilder(null, obj)
 		})
-
-		// this.active = partials[0].el
-
-		// if (this.parent) this.parent.appendChild(partials[0].el)
 	}
 
-
+	Concise.prototype.Controller = Controller
 
 	function Controller(name, constructor){
 		var self = this
