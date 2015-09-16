@@ -67,12 +67,8 @@ The only time you EVER need a semi-colon for statement termination:
 	 */
 
 	function Concise(){
-
-		this.current_view = null
-
-		// var view = document.createElement('div')
-		// view.id = 'view'
-		// var view = document.createDocumentFragment()
+		this.ctrls = []
+		this.ctrls.active = null
 	}
 
 	Concise.prototype.useExtension = function(obj){
@@ -82,12 +78,15 @@ The only time you EVER need a semi-colon for statement termination:
 			Extensions = obj
 	}
 
-	Concise.prototype.setView = function(view){
-		// if (this.current_view) this.view_body.removeChild(this.current_view)
-		if (this.current_view !== view) {
-			this.current_view = view
-			// this.view_body.appendChild(view)
-			document.body.insertBefore(view, document.body.firstChild)
+	Concise.prototype.setView = function(ctrl){
+		var ccs = this
+
+		if (ccs.ctrls.active !== ctrl) {
+
+			if (ccs.ctrls.active) ccs.ctrls.active.builder.el = vacateNode(document.body)
+
+			ccs.ctrls.active = ctrl
+			document.body.insertBefore(ctrl.builder.el, document.body.firstChild)
 		}
 	}
 
@@ -152,6 +151,7 @@ The only time you EVER need a semi-colon for statement termination:
 
 	function Controller(name, constructor){
 		var self = this
+		concise.ctrls.push(self)
 		console.info('new controller:', name, self)
 
 		self._id = name || Math.random().toString().split('.')[1]
@@ -163,7 +163,7 @@ The only time you EVER need a semi-colon for statement termination:
 
 		return function(){
 			_controller_events.trigger(self._id)
-			concise.setView(self.builder.el)
+			concise.setView(self)
 		}
 	}
 	Controller.prototype.onActive = function(fn){
@@ -448,6 +448,16 @@ The only time you EVER need a semi-colon for statement termination:
 		module.exports = concise
 	} else {
 		global.concise = concise
+	}
+
+
+	function vacateNode(el){
+		var frag = new DocumentFragment()
+
+		// This removes a.firstChild from wherever it is and into a doc frag.
+		while (el.firstChild) frag.appendChild(el.firstChild)
+
+		return frag
 	}
 
 })()
