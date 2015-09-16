@@ -44,7 +44,7 @@ The only time you EVER need a semi-colon for statement termination:
 	global.familyOf = require('typeof').familyOf
 	global.typeOf = require('typeof').typeOf
 
-	var Context = null
+	var Extensions = null
 	var connected = require('connected')
 	var Bindable = connected.Bindable
 
@@ -53,7 +53,6 @@ The only time you EVER need a semi-colon for statement termination:
 	var _current_modifiers_
 	var MicroEvent = require('microevent')
 	var _controller_events = new MicroEvent()
-	var _regions
 
 	var runway = require('runway/runway-browser.js')
 	Object.keys(runway).map(function(prop){
@@ -71,26 +70,25 @@ The only time you EVER need a semi-colon for statement termination:
 
 		this.current_view = null
 
-		var view = document.createElement('div')
-		view.id = 'view'
-
-		var body = document.querySelector('body')
-		body.insertBefore(view, body.firstChild)
-
-		this.view_body = view
+		// var view = document.createElement('div')
+		// view.id = 'view'
+		// var view = document.createDocumentFragment()
 	}
 
-	Concise.prototype.setContextObject = function(obj){
+	Concise.prototype.useExtension = function(obj){
 		if (typeOf(obj) !== 'Function')
-			throw new Error('Concise.setContextObject() called but expects a constructor function only.')
+			throw new Error('Concise.useExtension() called but expects a constructor function only.')
 		else
-			Context = obj
+			Extensions = obj
 	}
 
 	Concise.prototype.setView = function(view){
-		if (this.current_view) this.view_body.removeChild(this.current_view)
-		this.current_view = view
-		this.view_body.appendChild(view)
+		// if (this.current_view) this.view_body.removeChild(this.current_view)
+		if (this.current_view !== view) {
+			this.current_view = view
+			// this.view_body.appendChild(view)
+			document.body.insertBefore(view, document.body.firstChild)
+		}
 	}
 
 	Concise.prototype.Model = function(name, obj) {
@@ -129,59 +127,47 @@ The only time you EVER need a semi-colon for statement termination:
 	Concise.prototype.helpers = require('concise/concise.helpers.js')
 	Concise.prototype.Controller = Controller
 	Concise.prototype.models = new Bindable({})
+	Concise.prototype.Region = Region
 
 
+	function Region(partials){
+		this.area = document.createElement('div')
 
-	function Regions(){
-
-		this.list = {}
-
-		var self = this
-
-		self.define = function(name, el){
-			if (! self.list[name]) {
-				self.list[name] = el
-			} else {
-				console.error('ERROR: Cannot redefine partial "'+name+'"')
+		this.changeTo = function(num){
+			var C$ = partials[num]
+			if (C$ && typeOf(C$) === 'DomBuilder') {
+				if (this.area.firstChild) this.area.removeChild(this.area.firstChild)
+				this.area.appendChild(C$.el.cloneNode(true))
 			}
 		}
 
-		self.newMention = function(name, C$){
-			if (self.list[name]) renderPartial()
-			self.bind(name, renderPartial)
+		// Partials is an array of view objects.
+		partials.map(function(obj,i){
+			if (typeOf(obj) !== 'Object') throw new Error('Region received invalid view object. Expected plain JS object.')
+			partials[i] = new DomBuilder(null, obj)
+		})
 
-			function renderPartial(){
-				C$.el.innerHTML = ''
-				C$.dom = self.list[name]
-			}
-		}
-	}
-	_regions = (new Regions())
-	MicroEvent.mixin(Regions)
+		// this.active = partials[0].el
 
-	Concise.prototype.Region = function Region(name, el){
-		_regions.define(name, el)
+		// if (this.parent) this.parent.appendChild(partials[0].el)
 	}
 
 
 
 	function Controller(name, constructor){
-		console.log(this)
+		var self = this
+		console.info('new controller:', name, self)
 
-		this._id = name || Math.random().toString().split('.')[1]
-		// this.parent = concise
+		self._id = name || Math.random().toString().split('.')[1]
 
-		var view = document.createElement('div')
-		view.id = name || this._id
+		self.builder = new DomBuilder(null)
+		self.builder.el = new DocumentFragment()
 
-		this.builder = new DomBuilder(null, view)
-
-		// arguments[arguments.length-1].call(this)
-		constructor.call(this)
+		constructor.call(self)
 
 		return function(){
-			_controller_events.trigger(this._id)
-			concise.setView(view)
+			_controller_events.trigger(self._id)
+			concise.setView(self.builder.el)
 		}
 	}
 	Controller.prototype.onActive = function(fn){
@@ -198,10 +184,10 @@ The only time you EVER need a semi-colon for statement termination:
 
 
 
-	function DomBuilder(parent, el){
-		this.el = el
+	function DomBuilder(parent, struc){
 		this.parent = parent || {}
 		this.validates = false
+		if (struc) this.dom = struc
 	}
 
 	DEFINE(DomBuilder.prototype, 'dom', {enumerable:false, configurable:false,
@@ -214,6 +200,8 @@ The only time you EVER need a semi-colon for statement termination:
 
 		var helper_fn, helper_str, builder, val, expected_model, data, parsed, el
 
+		// This should only happen when the DomBuilder has been called at the top level.
+		if (! this.el) this.el = new DocumentFragment()
 
 		Object.keys(structure).map( recursiveDomBuildingProcess.bind(this) )
 
@@ -234,7 +222,7 @@ The only time you EVER need a semi-colon for statement termination:
 			switch (true)
 			{
 				case !! (parsed.helpers && parsed.helpers.length):
-					var context = Context ? new Context() : {}
+					var ext = Extensions ? new Extensions() : {}
 
 					parsed.helpers.map(function(helper_str){
 						var _parent, _prop
@@ -243,40 +231,48 @@ The only time you EVER need a semi-colon for statement termination:
 						helper_fn = concise.helpers[ helper_str.split('(')[0] ]
 
 						expected_model = /\((.+)\)/g.exec(helper_str)[1]
+
 						data = expected_model.split('.').reduce(function(object, prop){
 							_parent = object
 							_prop = prop
 							return object[prop]
 						}, concise.models)
-						if (! data) {
+
+						if (! data)
 							console.info('Alert! Expected model "'+expected_model+'" not available for each() templating helper')
-						}
-						builder = new DomBuilder(this, el)
-						helper_fn.call(context,builder,_parent,_prop,val)
+
+						builder = new DomBuilder(this)
+						builder.el = el
 						this.el.appendChild(el)
+						helper_fn.call(ext,builder,_parent,_prop,val)
 
 					}.bind(this))
 					break
 
-				case typeOf(val) === 'Function':
-					var context = Context ? new Context() : {}
-
-					builder = new DomBuilder(this, el)
-					val.call(context, builder)
-					this.el.appendChild(el)
-
-					break
-
-				case typeOf(val) === 'Object':
-					domBuilderMethod.call({ el:el, parent:this.parent }, val)
-					this.el.appendChild(el)
-
+				case typeOf(val) === 'Region':
+					this.el.appendChild(val.area)
+					val.parent = this.el
 					break
 
 				case typeOf(val) === 'String':
 					el.innerHTML = val
 					this.el.appendChild(el)
+					break
 
+				case typeOf(val) === 'Function':
+					var ext = Extensions ? new Extensions() : {}
+
+					builder = new DomBuilder(this)
+					builder.el = el
+					this.el.appendChild(el)
+					val.call(ext, builder)
+					break
+
+				case typeOf(val) === 'Object':
+					builder = new DomBuilder(this)
+					builder.el = el
+					this.el.appendChild(el)
+					builder.dom = val
 					break
 			}
 		}
@@ -310,10 +306,6 @@ The only time you EVER need a semi-colon for statement termination:
 
 	DomBuilder.prototype.setValid = function(bool, string){
 		this.el.setCustomValidity( bool ? '' : string )
-	}
-
-	DomBuilder.prototype.partial = function(name){
-		if (_regions) _regions.newMention(name, this)
 	}
 
 	DomBuilder.prototype.formValidate = function(){
