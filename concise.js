@@ -44,7 +44,7 @@ The only time you EVER need a semi-colon for statement termination:
 	global.familyOf = require('typeof').familyOf
 	global.typeOf = require('typeof').typeOf
 
-	var Extensions = null
+	// var Extensions = null
 	var connected = require('connected')
 	var Bindable = connected.Bindable
 
@@ -67,33 +67,28 @@ The only time you EVER need a semi-colon for statement termination:
 	 */
 
 	function Concise(){
-		this.ctrls = []
-		this.ctrls.active = null
+		this.controllers = {}
+		this.activeController = null
 	}
 
-	Concise.prototype.useExtension = function(obj){
-		if (typeOf(obj) !== 'Function')
-			throw new Error('Concise.useExtension() called but expects a constructor function only.')
-		else
-			Extensions = obj
-	}
+	// Concise.prototype.useExtension = function(obj){
+	// 	if (typeOf(obj) !== 'Function')
+	// 		throw new Error('Concise.useExtension() called but expects a constructor function only.')
+	// 	else
+	// 		Extensions = obj
+	// }
 
 	Concise.prototype.setView = function(ctrl){
-		var ccs = this
+		var self = this
 
-		if (ccs.ctrls.active !== ctrl) {
+		if (self.activeController !== ctrl) {
 
-			if (ccs.ctrls.active) ccs.ctrls.active.builder.el = vacateNode(document.body)
+			if (self.activeController) self.activeController.builder.el = vacateNode( concise.viewParent )
 
-			ccs.ctrls.active = ctrl
-			document.body.insertBefore(ctrl.builder.el, document.body.firstChild)
-		}
-	}
-
-	Concise.prototype.Model = function(name, obj) {
-		if (typeOf(obj) === 'Object' || typeOf(obj) === 'Array') {
-			concise.models._new_property_ = [name, new Bindable(obj)]
-			return concise.models[name]
+			self.activeController = ctrl
+			if (concise.viewParent && /^HTML.*Element/.test(typeOf(concise.viewParent))) {
+				concise.viewParent.insertBefore(ctrl.builder.el, concise.viewParent.firstChild)
+			}
 		}
 	}
 
@@ -123,13 +118,15 @@ The only time you EVER need a semi-colon for statement termination:
 		document.body.appendChild(js)
 	}
 
-	Concise.prototype.helpers = require('concise/concise.helpers.js')
+	Concise.prototype.Controller = require('./internal/concise.controller.js')(concise, DEFINE, _controller_events, DomBuilder)
+
+	Concise.prototype.Model = require('./internal/concise.model.js')(concise, Bindable)
 
 	Concise.prototype.models = new Bindable({})
 
-	Concise.prototype.Region = Region
+	Concise.prototype.helpers = require('./internal/concise.helpers.js')
 
-	function Region(partials){
+	Concise.prototype.Region = function Region(partials){
 		this.area = document.createElement('div')
 
 		this.changeTo = function(num){
@@ -143,137 +140,95 @@ The only time you EVER need a semi-colon for statement termination:
 		// Partials is an array of view objects.
 		partials.map(function(obj,i){
 			if (typeOf(obj) !== 'Object') throw new Error('Region received invalid view object. Expected plain JS object.')
-			partials[i] = new DomBuilder(null, obj)
+			partials[i] = new DomBuilder(null, null, obj)
 		})
 	}
 
-	Concise.prototype.Controller = Controller
-
-	function Controller(name, constructor){
-		var self = this
-		concise.ctrls.push(self)
-		console.info('new controller:', name, self)
-
-		self._id = name || Math.random().toString().split('.')[1]
-
-		self.builder = new DomBuilder(null)
-		self.builder.el = new DocumentFragment()
-
-		constructor.call(self)
-
-		return function(){
-			_controller_events.trigger(self._id)
-			concise.setView(self)
-		}
-	}
-	Controller.prototype.onActive = function(fn){
-		_controller_events.bind(this._id, fn)
-	}
-	DEFINE(Controller.prototype, 'view', {enumerable:false, configurable:false,
-		set:function(view){
-			this.builder.dom = typeOf(view) === 'Function' ? view(this) : view
-		}
-	})
-	DEFINE(Controller.prototype, 'models', {enumerable:false, configurable:false,
-		get:function(){ return concise.models }
-	})
 
 
-
-	function DomBuilder(parent, struc){
+	function DomBuilder(parent, el, value){
 		this.parent = parent || {}
+		this.el = el || null
 		this.validates = false
-		if (struc) this.dom = struc
+		if (value) {
+			if (typeOf(value) === 'Object') this.dom = value
+			else if (typeOf(value) === 'Function') value(this)
+		}
 	}
 
 	DEFINE(DomBuilder.prototype, 'dom', {enumerable:false, configurable:false,
-		set:domBuilderMethod
+		set:buildDom
 	})
-	function domBuilderMethod(structure){
-		//console.log(typeOf(structure), structure)
+	function buildDom(structure){
 		if (! familyOf(this.el)) throw new Error('Missing valid view element. Cannot build a DOM before doing `$.view = document.querySelector(<your_selector>)`.')
 		if (typeOf(structure) !== 'Object') throw new Error('Invalid dom structure object.')
 
-		var helper_fn, helper_str, builder, val, expected_model, data, parsed, el
+		if (! this.el) console.log('No element above current element')
 
-		// This should only happen when the DomBuilder has been called at the top level.
-		if (! this.el) this.el = new DocumentFragment()
+		// For every property, do recursive build.
+		for (var el_str in structure) {
+			if (structure.hasOwnProperty(el_str)) buildRecursively.call(this, el_str, structure)
+		}
+	}
 
-		Object.keys(structure).map( recursiveDomBuildingProcess.bind(this) )
+	function buildRecursively(key, structure){
+		var parsed
+		var val
+		var el
 
-		function recursiveDomBuildingProcess(key){
-			val = structure[key]
+		if (! elDefinitionValidate(key)) return
 
-			if (! elDefinitionValidate(key)) return
+		parsed = parseElementString(key)
+		this.validates = parsed.validate
+		el = parsed.el
 
-			parsed = parseElementString(key)
-			if (parsed.validate) this.validates = true
-			el = parsed.el
-
-			if (! val) {
-				this.el.appendChild(el)
-				return
-			}
-
-			switch (true)
-			{
-				case !! (parsed.helpers && parsed.helpers.length):
-					var ext = Extensions ? new Extensions() : {}
-
-					parsed.helpers.map(function(helper_str){
-						var _parent, _prop
-						if (typeOf(val) !== 'Function') throw new Error('DOM object "'+key+'" defined with helper method but has no function upon which to apply it.')
-
-						helper_fn = concise.helpers[ helper_str.split('(')[0] ]
-
-						expected_model = /\((.+)\)/g.exec(helper_str)[1]
-
-						data = expected_model.split('.').reduce(function(object, prop){
-							_parent = object
-							_prop = prop
-							return object[prop]
-						}, concise.models)
-
-						if (! data)
-							console.info('Alert! Expected model "'+expected_model+'" not available for each() templating helper')
-
-						builder = new DomBuilder(this)
-						builder.el = el
-						this.el.appendChild(el)
-						helper_fn.call(ext,builder,_parent,_prop,val)
-
-					}.bind(this))
-					break
-
-				case typeOf(val) === 'Region':
-					this.el.appendChild(val.area)
-					val.parent = this.el
-					break
-
-				case typeOf(val) === 'String':
-					el.innerHTML = val
-					this.el.appendChild(el)
-					break
-
-				case typeOf(val) === 'Function':
-					var ext = Extensions ? new Extensions() : {}
-
-					builder = new DomBuilder(this)
-					builder.el = el
-					this.el.appendChild(el)
-					val.call(ext, builder)
-					break
-
-				case typeOf(val) === 'Object':
-					builder = new DomBuilder(this)
-					builder.el = el
-					this.el.appendChild(el)
-					builder.dom = val
-					break
-			}
+		val = structure[key]
+		if (! val) {
+			this.el.appendChild(el)
+			return
+		}
+		if (parsed.helpers && parsed.helpers.length) {
+			execHelpers.call(this, parsed, el, val)
+		}
+		else {
+			(typeOf(val) === 'String') ? el.innerHTML = val : builder = new DomBuilder(this, el, val)
 		}
 
+		this.el.appendChild(el)
 		if (this.parent && this.parent.validates && this.el.tagName === 'FORM') this.formValidate()
+	}
+
+	function execHelpers(parsed, el, val){
+		var data
+		var expected_model
+		var helper_str
+		var helper_fn
+		var builder
+		// var ext = Extensions ? new Extensions() : {}
+
+		parsed.helpers.map(function(helper_str){
+			var _parent, _prop
+			if (typeOf(val) !== 'Function') throw new Error('DOM object "'+key+'" defined with helper method but has no function upon which to apply it.')
+
+			helper_fn = concise.helpers[ helper_str.split('(')[0] ]
+
+			expected_model = /\((.+)\)/g.exec(helper_str)[1]
+
+			data = expected_model.split('.').reduce(function(object, prop){
+				_parent = object
+				_prop = prop
+				return object[prop]
+			}, concise.models)
+
+			if (! data)
+				console.info('Alert! Expected model "'+expected_model+'" not available for each() templating helper')
+
+			builder = new DomBuilder(this, el)
+			this.el.appendChild(el)
+			helper_fn(builder,_parent,_prop,val)
+			// helper_fn.call(ext,builder,_parent,_prop,val)
+
+		}.bind(this))
 	}
 
 	DEFINE(DomBuilder.prototype, 'model', {enumerable:false, configurable:false, set:function(){},
@@ -373,23 +328,18 @@ The only time you EVER need a semi-colon for statement termination:
 			el.id = id
 
 
-		// Now for the hard stuff. Handling property values and helper referrences.
+		// Handling property values and helper referrences.
 
 		if (parts[2]) {
 			props_helpers = parts[2]
-
-// console.log( 'BEFORE', props_helpers ) // KEEP THIS FOR FUTURE DEBUGGING
 
 			tokens = props_helpers.match(_reg)
 			if (/\w+\(.*\)$/g.test(props_helpers) && /\w+\((?:[^\w].*|.*[^\w])\)$/g.test(props_helpers))
 				throw new Error('Invalid helper definition: '+props_helpers)
 
-// console.log( 'AFTER', tokens ) // KEEP THIS FOR FUTURE DEBUGGING
-
 			validate = tokens.indexOf('validate') !== -1
 
 			tokens.map(function(string, id){
-				// console.log( 'TOKEN', string )
 				switch (true) {
 
 					case (/^[\w\d][\w\d-]*$/.test(string)):
@@ -403,7 +353,6 @@ The only time you EVER need a semi-colon for statement termination:
 						property_path = matches[1].split('.')
 						property_path[property_path.length] = matches[2]
 						properties[properties.length] = property_path
-						// console.log('PROP PATH', property_path)
 						break
 
 					case (/^\w[\w\d]+\([^)]+\)$/.test(string)):
@@ -443,14 +392,6 @@ The only time you EVER need a semi-colon for statement termination:
 		else return true
 	}
 
-
-	if (typeof module !== 'undefined' && module.hasOwnProperty('exports')) {
-		module.exports = concise
-	} else {
-		global.concise = concise
-	}
-
-
 	function vacateNode(el){
 		var frag = new DocumentFragment()
 
@@ -460,4 +401,5 @@ The only time you EVER need a semi-colon for statement termination:
 		return frag
 	}
 
+	module.exports = global.concise = concise
 })()

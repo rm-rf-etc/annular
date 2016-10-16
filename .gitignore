@@ -1,7 +1,3 @@
 .DS_Store
-
-node_modules/*
-!node_modules/typeof
-!node_modules/connected
-!node_modules/concise
-!node_modules/runway
+node_modules/
+build/
